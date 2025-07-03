@@ -2,9 +2,9 @@ use crate::grad_clipping::GradientClippingConfig;
 use crate::module::AutodiffModule;
 use crate::{self as burn, LearningRate};
 
-use super::SimpleOptimizer;
 use super::decay::{WeightDecay, WeightDecayConfig};
 use super::momentum::{Momentum, MomentumConfig, MomentumState};
+use super::{NewtonSchulz, NewtonSchulzConfig, SimpleOptimizer};
 use crate::config::Config;
 use crate::optim::adaptor::OptimizerAdaptor;
 use crate::record::Record;
@@ -20,6 +20,8 @@ pub struct SgdConfig {
     momentum: Option<MomentumConfig>,
     /// [Gradient Clipping](GradientClippingConfig) config.
     gradient_clipping: Option<GradientClippingConfig>,
+    /// [Newton-Schulz](NewtonSchulzConfig) config.
+    newton_schulz: Option<NewtonSchulzConfig>,
 }
 
 /// Optimizer that implements stochastic gradient descent with momentum.
@@ -28,6 +30,7 @@ pub struct SgdConfig {
 #[derive(Clone)]
 pub struct Sgd<B: Backend> {
     momentum: Option<Momentum<B>>,
+    newton_schulz: Option<NewtonSchulz<B>>,
     weight_decay: Option<WeightDecay>,
 }
 
@@ -45,10 +48,12 @@ impl SgdConfig {
     ) -> OptimizerAdaptor<Sgd<B::InnerBackend>, M, B> {
         let momentum = self.momentum.as_ref().map(Momentum::new);
         let weight_decay = self.weight_decay.as_ref().map(WeightDecay::new);
+        let newton_schulz = self.newton_schulz.as_ref().map(NewtonSchulz::new);
 
         let mut optim = OptimizerAdaptor::from(Sgd {
             momentum,
             weight_decay,
+            newton_schulz,
         });
         if let Some(config) = &self.gradient_clipping {
             optim = optim.with_grad_clipping(config.init());
@@ -84,6 +89,9 @@ impl<B: Backend> SimpleOptimizer<B> for Sgd<B> {
         }
 
         let state = SgdState::new(state_momemtum);
+        if let Some(newton_schulz) = &self.newton_schulz {
+            grad = newton_schulz.transform(grad);
+        }
         let delta = grad.mul_scalar(lr);
 
         (tensor - delta, Some(state))
@@ -174,6 +182,7 @@ mod tests {
                 nesterov: true,
             }),
             gradient_clipping: None,
+            newton_schulz: None, // Don't modify behaviour for now.
         }
         .init()
     }
