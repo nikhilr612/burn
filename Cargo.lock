@@ -4264,6 +4264,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mumnist"
+version = "0.18.0"
+dependencies = [
+ "burn",
+ "log",
+ "serde",
+]
+
+[[package]]
 name = "naga"
 version = "25.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

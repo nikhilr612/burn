@@ -1,13 +1,11 @@
 //! Implement Newton-Schulz method for matrix orthogonalization.
-use core::marker::PhantomData;
-
-use burn_tensor::backend::Backend;
-use burn_tensor::{Float, Tensor};
 
 use crate as burn;
 use crate::config::Config;
+use burn_tensor::backend::Backend;
+use burn_tensor::{Float, Tensor};
 
-/// Configuration for the Newton-Schulz method.
+/// Configuration for the Newton-Schulz Orthogonalization method.
 #[derive(Config)]
 pub struct NewtonSchulzConfig {
     /// The number of iterations to perform.
@@ -26,16 +24,15 @@ pub struct NewtonSchulzConfig {
 
 /// Implementation for Newton-Schulz method for matrix orthogonalization.
 #[derive(Clone)]
-pub struct NewtonSchulz<B: Backend> {
+pub struct NewtonSchulz {
     iterations: usize,
     coef_a: f32,
     coef_b: f32,
     coef_c: f32,
     epsilon: f32,
-    _phantom: PhantomData<B>, // no state here.
 }
 
-impl<B: Backend> NewtonSchulz<B> {
+impl NewtonSchulz {
     /// Creates a new [NewtonSchulz](NewtonSchulz) instance from the provided config.
     pub fn new(config: &NewtonSchulzConfig) -> Self {
         Self {
@@ -44,17 +41,19 @@ impl<B: Backend> NewtonSchulz<B> {
             coef_b: config.coef_b,
             coef_c: config.coef_c,
             epsilon: config.epsilon,
-            _phantom: PhantomData,
         }
     }
 }
 
-impl<B: Backend> NewtonSchulz<B> {
+impl NewtonSchulz {
     /// Orthogonalize the gradient.
-    pub fn transform<const D: usize>(&self, grad: Tensor<B, D, Float>) -> Tensor<B, D, Float> {
+    pub fn transform<const D: usize, B: Backend>(
+        &self,
+        grad: Tensor<B, D, Float>,
+    ) -> Tensor<B, D, Float> {
         let dims: [usize; D] = grad.shape().dims();
-        if D > 2 {
-            // no-op for higher dimensions
+        if D != 2 {
+            // no-op for 1D or higher dimension tensors.
             // TODO: maybe flatten and apply?
             return grad;
         }

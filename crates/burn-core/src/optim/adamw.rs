@@ -1,4 +1,4 @@
-use super::{AdaptiveMomentumState, SimpleOptimizer};
+use super::{AdaptiveMomentumState, NewtonSchulz, NewtonSchulzConfig, SimpleOptimizer};
 use crate::config::Config;
 use crate::optim::adaptor::OptimizerAdaptor;
 use crate::tensor::{Tensor, backend::AutodiffBackend};
@@ -28,6 +28,8 @@ pub struct AdamWConfig {
     weight_decay: f32,
     /// [Gradient Clipping](GradientClippingConfig) config.
     grad_clipping: Option<GradientClippingConfig>,
+    /// [Newton-Schulz](NewtonSchulzConfig) config.
+    newton_schulz: Option<NewtonSchulzConfig>,
 }
 
 /// AdamW optimizer as described in the paper [Decoupled Weight Decay Regularization, Loshchilov and Hutter, 2019](https://arxiv.org/abs/1711.05101).
@@ -35,6 +37,7 @@ pub struct AdamWConfig {
 pub struct AdamW {
     momentum: AdaptiveMomentumW,
     weight_decay: f32,
+    newton_schulz: Option<NewtonSchulz>,
 }
 
 /// AdamW state.
@@ -61,11 +64,17 @@ impl<B: Backend> SimpleOptimizer<B> for AdamW {
     ) -> (Tensor<B, D>, Option<Self::State<D>>) {
         let tensor_updated = tensor.clone() - tensor.mul_scalar(lr).mul_scalar(self.weight_decay);
 
-        let (raw_delta, momentum_state) = self.momentum.transform(grad, state.map(|s| s.momentum));
+        let (mut raw_delta, momentum_state) =
+            self.momentum.transform(grad, state.map(|s| s.momentum));
 
         let state = AdamWState {
             momentum: momentum_state,
         };
+
+        if let Some(ns) = &self.newton_schulz {
+            // Apply Newton-Schulz method to the update delta.
+            raw_delta = ns.transform(raw_delta);
+        }
 
         (tensor_updated - raw_delta.mul_scalar(lr), Some(state))
     }
@@ -90,6 +99,7 @@ impl AdamWConfig {
                 epsilon: self.epsilon,
             },
             weight_decay: self.weight_decay,
+            newton_schulz: self.newton_schulz.as_ref().map(NewtonSchulz::new),
         };
 
         let mut optim = OptimizerAdaptor::from(optim);
@@ -361,6 +371,7 @@ mod tests {
                 epsilon: config.epsilon,
             },
             weight_decay: config.weight_decay,
+            newton_schulz: None, // No Newton-Schulz for this test.
         }
         .into()
     }

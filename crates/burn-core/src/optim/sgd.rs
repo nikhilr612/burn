@@ -30,7 +30,7 @@ pub struct SgdConfig {
 #[derive(Clone)]
 pub struct Sgd<B: Backend> {
     momentum: Option<Momentum<B>>,
-    newton_schulz: Option<NewtonSchulz<B>>,
+    newton_schulz: Option<NewtonSchulz>,
     weight_decay: Option<WeightDecay>,
 }
 
